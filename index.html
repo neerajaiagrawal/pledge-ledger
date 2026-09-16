@@ -112,7 +112,7 @@
 <main>
   <!-- ============ INTAKE ============ -->
   <section id="tab-intake" class="tab active">
-    <div class="card">
+    <div class="card" id="scanCard">
       <h2>Scan a pledge card</h2>
       <p class="hint">Point the camera at a completed card, capture it, then check the details before saving. Works best in good light, card flat and fully in frame.</p>
 
@@ -184,6 +184,17 @@
         <button class="btn-ok" id="saveBtn">💾 Save to Google Sheet</button>
       </div>
       <div class="status" id="saveStatus"></div>
+    </div>
+
+    <div class="card" id="savedCard" style="display:none;text-align:center">
+      <div style="font-size:52px;line-height:1">✅</div>
+      <h2 style="justify-content:center;margin-top:8px">Saved to the sheet</h2>
+      <div id="savedDonor" style="font-size:30px;font-weight:800;color:var(--sac-blue);margin:8px 0"></div>
+      <p class="hint" id="savedHint" style="margin:0 0 4px">Write this number on the card, then scan the next one.</p>
+      <p class="hint" id="savedMeta" style="margin:0"></p>
+      <div class="btn-row">
+        <button class="btn-primary" id="nextBtn">📷 Scan next card</button>
+      </div>
     </div>
   </section>
 
@@ -419,25 +430,40 @@ $('saveBtn').addEventListener('click',async ()=>{
   try{
     const j = await postJSON(url,{action:'save',fields,scannedBy:getWho(),image:capturedDataUrl,mime:'image/jpeg'});
     if(!j.ok) throw new Error(j.error||'Save failed');
-    const donor = j.donorNo ? (j.autoNumber?'  Donor #'+esc(String(j.donorNo))+' (auto)':'  Donor #'+esc(String(j.donorNo))) : '';
-    setStatus('saveStatus','Saved ✓'+donor+'  ('+j.rows+' total)','ok');
-    setTimeout(resetIntake,1800);
+    showSaved(j);
   }catch(e){
     setStatus('saveStatus','Failed: '+e.message,'err');
   }finally{ $('saveBtn').disabled=false; }
 });
 
+// Show a persistent confirmation that stays until the volunteer taps "Scan next card".
+function showSaved(j){
+  $('savedDonor').innerHTML = j.donorNo ? 'Donor #'+esc(String(j.donorNo)) : 'Saved ✓';
+  $('savedHint').style.display = j.donorNo ? 'block' : 'none';
+  $('savedMeta').textContent = (j.rows||0)+' total pledge'+((j.rows===1)?'':'s')+' in the sheet';
+  $('scanCard').style.display='none';
+  $('reviewCard').style.display='none';
+  $('savedCard').style.display='block';
+  setStatus('saveStatus','');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+$('nextBtn').addEventListener('click',resetIntake);
+
 function resetIntake(){
   capturedDataUrl=null;
   $('preview').style.display='none'; $('preview').src='';
+  $('scanCard').style.display='block';
   $('captureZone').style.display='block';
   $('scanRow').style.display='none';
   $('reviewCard').style.display='none';
+  $('savedCard').style.display='none';
   FIELDS.forEach(k=>{ if($('f_'+k)) $('f_'+k).value=''; });
   $('f_company_match').value='No';
   $('flagsBox').style.display='none';
   setStatus('scanStatus',''); setStatus('saveStatus','');
   $('fileInput').value='';
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 
 /* ---------- records ---------- */
