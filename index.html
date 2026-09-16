@@ -295,6 +295,8 @@ $('cfgWho').value = getWho();
 $('cfgToken').value = getToken();
 
 // Lock the connection fields for volunteers; unlock them only in #edit mode.
+// Locked mode does NOT reveal the #edit unlock (that's for the admin only),
+// and masks the token so it isn't readable on a volunteer's screen.
 (function applyLock(){
   const locked = !ADMIN_EDIT;
   [$('cfgUrl'),$('cfgToken')].forEach(el=>{
@@ -302,8 +304,9 @@ $('cfgToken').value = getToken();
     el.style.opacity = locked ? '.7' : '1';
     el.style.cursor = locked ? 'not-allowed' : 'text';
   });
+  $('cfgToken').type = locked ? 'password' : 'text';
   $('lockNote').innerHTML = locked
-    ? '🔒 Connection locked. To change the URL or token, open this app with <code>#edit</code> at the end of the address.'
+    ? '🔒 Connection locked.'
     : '🔓 Edit mode — you can change the connection URL and token, then press Save settings.';
 })();
 
