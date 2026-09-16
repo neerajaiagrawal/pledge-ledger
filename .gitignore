@@ -1,0 +1,11 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Never commit secrets — the Gemini key lives in Apps Script Script Properties, not here
+.env
+*.key
+secrets.json

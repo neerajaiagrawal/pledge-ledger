@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>SAC Pledge Ledger</title>
+<style>
+  :root{
+    --sac-blue:#1f4e9c; --sac-blue-dark:#173a75; --sac-orange:#e8792b;
+    --bg:#f4f6fb; --card:#ffffff; --ink:#1a2233; --muted:#64708a;
+    --line:#e2e7f0; --ok:#1a7f4b; --warn:#b26a00; --err:#c0392b;
+    --shadow:0 2px 10px rgba(20,40,90,.08);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0f1420; --card:#171d2b; --ink:#e8edf6; --muted:#93a0b8;
+      --line:#2a3346; --shadow:0 2px 12px rgba(0,0,0,.4);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.45;
+    -webkit-text-size-adjust:100%;
+  }
+  header{
+    background:linear-gradient(135deg,var(--sac-blue),var(--sac-blue-dark));
+    color:#fff; padding:16px 16px calc(16px + env(safe-area-inset-top)); padding-top:calc(16px + env(safe-area-inset-top));
+    display:flex; align-items:center; gap:12px;
+  }
+  .logo{
+    width:38px;height:38px;border-radius:9px;background:var(--sac-orange);
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:#fff;flex:0 0 auto;
+  }
+  header h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.2px}
+  header p{margin:1px 0 0;font-size:12px;opacity:.85}
+  main{max-width:640px;margin:0 auto;padding:16px 16px 96px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow);margin-bottom:16px}
+  h2{font-size:15px;margin:0 0 4px}
+  .hint{color:var(--muted);font-size:13px;margin:0 0 14px}
+  label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:12px 0 5px;text-transform:uppercase;letter-spacing:.3px}
+  input,textarea,select{
+    width:100%;padding:11px 12px;font-size:16px;border:1px solid var(--line);
+    border-radius:10px;background:var(--bg);color:var(--ink);font-family:inherit;
+  }
+  input:focus,textarea,select:focus{outline:2px solid var(--sac-blue);border-color:transparent}
+  textarea{resize:vertical;min-height:64px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .row3{display:grid;grid-template-columns:2fr 1fr 1.2fr;gap:12px}
+  @media(max-width:460px){.row3{grid-template-columns:1fr 1fr}}
+  button{
+    font-family:inherit;font-size:15px;font-weight:600;border:none;border-radius:11px;
+    padding:13px 16px;cursor:pointer;transition:transform .05s,filter .15s;width:100%;
+  }
+  button:active{transform:scale(.99)}
+  .btn-primary{background:var(--sac-blue);color:#fff}
+  .btn-accent{background:var(--sac-orange);color:#fff}
+  .btn-ghost{background:transparent;color:var(--sac-blue);border:1px solid var(--sac-blue)}
+  .btn-ok{background:var(--ok);color:#fff}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .btn-row{display:flex;gap:10px;margin-top:14px}
+  .btn-row button{flex:1}
+  .capture-zone{
+    border:2px dashed var(--line);border-radius:14px;padding:26px 16px;text-align:center;
+    background:var(--bg);cursor:pointer;
+  }
+  .capture-zone .big{font-size:40px;line-height:1}
+  .capture-zone .t{font-weight:700;margin-top:8px}
+  .capture-zone .s{color:var(--muted);font-size:13px;margin-top:4px}
+  #preview{width:100%;border-radius:12px;margin-top:12px;display:none;border:1px solid var(--line)}
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px}
+  .b-ok{background:rgba(26,127,75,.12);color:var(--ok)}
+  .b-err{background:rgba(192,57,43,.12);color:var(--err)}
+  .b-warn{background:rgba(178,106,0,.14);color:var(--warn)}
+  .b-idle{background:var(--bg);color:var(--muted)}
+  .flags{background:rgba(178,106,0,.12);color:var(--warn);border-radius:10px;padding:10px 12px;font-size:13px;margin-top:12px;display:none}
+  .status{font-size:13px;margin-top:12px;min-height:18px}
+  .status.ok{color:var(--ok)} .status.err{color:var(--err)} .status.busy{color:var(--sac-blue)}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  nav.tabs{
+    position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);
+    border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:20;
+  }
+  nav.tabs button{background:none;border:none;flex:1;padding:10px 4px;color:var(--muted);font-size:11px;font-weight:600;border-radius:0}
+  nav.tabs button .ic{display:block;font-size:20px;margin-bottom:2px}
+  nav.tabs button.active{color:var(--sac-blue)}
+  .tab{display:none} .tab.active{display:block}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.3px}
+  .rec-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .empty{text-align:center;color:var(--muted);padding:26px 8px;font-size:14px}
+  code{background:var(--bg);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:12px;word-break:break-all}
+  ol{padding-left:20px;font-size:14px} ol li{margin:6px 0}
+  .kv{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:6px 0;border-bottom:1px solid var(--line)}
+  .kv span:first-child{color:var(--muted)}
+  details summary{cursor:pointer;font-weight:600;color:var(--sac-blue);font-size:14px}
+  pre{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;font-size:11px;max-height:320px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">SAC</div>
+  <div>
+    <h1>Pledge Ledger</h1>
+    <p>Scan a card &rarr; AI reads it &rarr; Google Sheet</p>
+  </div>
+</header>
+
+<main>
+  <!-- ============ INTAKE ============ -->
+  <section id="tab-intake" class="tab active">
+    <div class="card">
+      <h2>Scan a pledge card</h2>
+      <p class="hint">Point the camera at a completed card, capture it, then check the details before saving. Works best in good light, card flat and fully in frame.</p>
+
+      <div class="capture-zone" id="captureZone">
+        <div class="big">📷</div>
+        <div class="t">Take / choose photo</div>
+        <div class="s">Opens the rear camera on your phone</div>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" capture="environment" hidden />
+      <img id="preview" alt="Card preview" />
+
+      <div class="btn-row" id="scanRow" style="display:none">
+        <button class="btn-ghost" id="retakeBtn">Retake</button>
+        <button class="btn-accent" id="scanBtn">✨ Read card with AI</button>
+      </div>
+      <div class="status" id="scanStatus"></div>
+    </div>
+
+    <div class="card" id="reviewCard" style="display:none">
+      <h2>Review &amp; save</h2>
+      <p class="hint">Check what the AI read. Fix anything, then save to the sheet.</p>
+      <div class="flags" id="flagsBox"></div>
+
+      <div class="row">
+        <div><label>Donor No</label><input id="f_donor_no" /></div>
+        <div><label>Name</label><input id="f_name" /></div>
+      </div>
+      <label>Address</label><input id="f_address" />
+      <div class="row3">
+        <div><label>City</label><input id="f_city" /></div>
+        <div><label>State</label><input id="f_state" /></div>
+        <div><label>Zip</label><input id="f_zip" /></div>
+      </div>
+      <div class="row">
+        <div><label>Phone</label><input id="f_phone" inputmode="tel" /></div>
+        <div><label>Email</label><input id="f_email" inputmode="email" /></div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Contribution</label>
+          <select id="f_contribution">
+            <option value="">— select —</option>
+            <option>One Child $250</option>
+            <option>Two Children $500</option>
+            <option>Three Children $750</option>
+            <option>Five Children $1,250</option>
+            <option>One Child for 12 years $2,500</option>
+            <option>Any Amount</option>
+          </select>
+        </div>
+        <div><label>Amount ($)</label><input id="f_amount" inputmode="decimal" /></div>
+      </div>
+      <div class="row3">
+        <div><label># Boys</label><input id="f_pref_boys" /></div>
+        <div><label># Girls</label><input id="f_pref_girls" /></div>
+        <div><label>Pref. State</label><input id="f_pref_state" /></div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Company Match</label>
+          <select id="f_company_match"><option>No</option><option>Yes</option></select>
+        </div>
+        <div><label>Company Name</label><input id="f_company_name" /></div>
+      </div>
+      <label>How did you hear about SAC</label><input id="f_how_heard" />
+      <label>Notes</label><textarea id="f_notes"></textarea>
+
+      <div class="btn-row">
+        <button class="btn-ok" id="saveBtn">💾 Save to Google Sheet</button>
+      </div>
+      <div class="status" id="saveStatus"></div>
+    </div>
+  </section>
+
+  <!-- ============ RECORDS ============ -->
+  <section id="tab-records" class="tab">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2 style="margin:0">History</h2>
+        <button class="btn-ghost" id="refreshBtn" style="width:auto;padding:8px 14px">↻ Refresh</button>
+      </div>
+      <p class="hint" style="margin-top:6px">Every saved pledge, newest first, straight from the Google Sheet.</p>
+      <div class="status" id="recStatus"></div>
+      <div class="rec-wrap"><table id="recTable"><tbody></tbody></table></div>
+      <div class="empty" id="recEmpty">Nothing here yet — scan and save a card, or press Refresh.</div>
+    </div>
+  </section>
+
+  <!-- ============ SETUP ============ -->
+  <section id="tab-setup" class="tab">
+    <div class="card">
+      <h2>Connection</h2>
+      <p class="hint">Paste the Apps Script web-app URL you deployed, then test it.</p>
+      <label>Apps Script web app URL</label>
+      <input id="cfgUrl" placeholder="https://script.google.com/macros/s/…/exec" />
+      <label>Scanned by (your name)</label>
+      <input id="cfgWho" placeholder="e.g. Neeraj" />
+      <div class="btn-row">
+        <button class="btn-ghost" id="testBtn">🔌 Test connection</button>
+        <button class="btn-primary" id="saveCfgBtn">Save settings</button>
+      </div>
+      <div class="status" id="cfgStatus"></div>
+      <div id="pingInfo"></div>
+    </div>
+
+    <div class="card">
+      <h2>How to set it up</h2>
+      <ol>
+        <li>Create a Google Sheet.</li>
+        <li>In it: <b>Extensions → Apps Script</b>. Delete any code, paste the contents of <code>apps-script/Code.gs</code>.</li>
+        <li>Get a free Gemini key at <code>aistudio.google.com/apikey</code>.</li>
+        <li>In Apps Script: <b>Project Settings (⚙) → Script Properties</b> → add <code>GEMINI_API_KEY</code> = your key.</li>
+        <li><b>Deploy → New deployment → Web app</b>. Execute as <b>Me</b>, access <b>Anyone</b>. Copy the <code>/exec</code> URL.</li>
+        <li>Paste that URL above and press <b>Test connection</b>.</li>
+      </ol>
+      <details><summary>Optional: archive card photos to Drive</summary>
+        <p class="hint" style="margin-top:8px">Add a Script Property <code>DRIVE_FOLDER_ID</code> with a Drive folder ID, and each saved card image is stored there with a link in the sheet.</p>
+      </details>
+    </div>
+
+    <div class="card">
+      <h2>Safety</h2>
+      <p class="hint" style="margin:0">The AI is instructed to <b>ignore credit-card number, CVV and expiry</b> — those are never read or stored. Keep the sheet private; it holds donor personal information.</p>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs">
+  <button data-tab="intake" class="active"><span class="ic">📷</span>Intake</button>
+  <button data-tab="records"><span class="ic">📋</span>Records</button>
+  <button data-tab="setup"><span class="ic">⚙️</span>Setup</button>
+</nav>
+
+<script>
+const $ = id => document.getElementById(id);
+const LS = { url:'sac_appsurl', who:'sac_scannedby' };
+let capturedDataUrl = null;
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('nav.tabs button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    const t=b.dataset.tab;
+    document.querySelectorAll('nav.tabs button').forEach(x=>x.classList.toggle('active',x===b));
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    $('tab-'+t).classList.add('active');
+    if(t==='records') loadRecords();
+  });
+});
+
+/* ---------- config ---------- */
+function getUrl(){ return (localStorage.getItem(LS.url)||'').trim(); }
+function getWho(){ return (localStorage.getItem(LS.who)||'').trim(); }
+$('cfgUrl').value = getUrl();
+$('cfgWho').value = getWho();
+
+$('saveCfgBtn').addEventListener('click',()=>{
+  localStorage.setItem(LS.url,$('cfgUrl').value.trim());
+  localStorage.setItem(LS.who,$('cfgWho').value.trim());
+  setStatus('cfgStatus','Settings saved.','ok');
+});
+
+$('testBtn').addEventListener('click',async ()=>{
+  const url=$('cfgUrl').value.trim();
+  if(!url){ setStatus('cfgStatus','Enter the web-app URL first.','err'); return; }
+  localStorage.setItem(LS.url,url);
+  localStorage.setItem(LS.who,$('cfgWho').value.trim());
+  setStatus('cfgStatus','Testing…','busy');
+  $('pingInfo').innerHTML='';
+  try{
+    const r = await fetch(url+'?action=ping&_='+Date.now());
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error||'Unknown error');
+    setStatus('cfgStatus','Connected ✓','ok');
+    const kv = (k,v)=>`<div class="kv"><span>${k}</span><span>${v}</span></div>`;
+    $('pingInfo').innerHTML =
+      kv('Spreadsheet', esc(j.spreadsheet)) +
+      kv('Sheet', esc(j.sheet)) +
+      kv('Saved pledges', j.rows) +
+      kv('Gemini key', j.geminiKey==='set'?'<span class="badge b-ok">set</span>':'<span class="badge b-err">MISSING</span>') +
+      kv('Model', esc(j.model)) +
+      kv('Drive archive', j.driveArchive);
+  }catch(e){
+    setStatus('cfgStatus','Failed: '+e.message+'. Check the URL is the /exec link and access is "Anyone".','err');
+  }
+});
+
+/* ---------- capture ---------- */
+$('captureZone').addEventListener('click',()=>$('fileInput').click());
+$('retakeBtn').addEventListener('click',()=>$('fileInput').click());
+$('fileInput').addEventListener('change',async e=>{
+  const file=e.target.files[0]; if(!file) return;
+  setStatus('scanStatus','Processing photo…','busy');
+  capturedDataUrl = await downscale(file, 1600, 0.82);
+  const img=$('preview'); img.src=capturedDataUrl; img.style.display='block';
+  $('captureZone').style.display='none';
+  $('scanRow').style.display='flex';
+  setStatus('scanStatus','');
+});
+
+function downscale(file,maxDim,quality){
+  return new Promise((res,rej)=>{
+    const img=new Image(); const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      let {width:w,height:h}=img;
+      if(w>h && w>maxDim){ h=Math.round(h*maxDim/w); w=maxDim; }
+      else if(h>=w && h>maxDim){ w=Math.round(w*maxDim/h); h=maxDim; }
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL('image/jpeg',quality));
+    };
+    img.onerror=rej; img.src=url;
+  });
+}
+
+/* ---------- scan with AI ---------- */
+$('scanBtn').addEventListener('click',async ()=>{
+  const url=getUrl();
+  if(!url){ setStatus('scanStatus','Set the Apps Script URL in Setup first.','err'); return; }
+  if(!capturedDataUrl){ setStatus('scanStatus','Take a photo first.','err'); return; }
+  $('scanBtn').disabled=true;
+  setStatus('scanStatus','<span class="spin"></span>Reading the card with AI…','busy');
+  try{
+    const j = await postJSON(url,{action:'scan',image:capturedDataUrl,mime:'image/jpeg'});
+    if(!j.ok) throw new Error(j.error||'Scan failed');
+    fillForm(j.fields);
+    $('reviewCard').style.display='block';
+    setStatus('scanStatus','Read complete — check the fields below.','ok');
+    $('reviewCard').scrollIntoView({behavior:'smooth'});
+  }catch(e){
+    setStatus('scanStatus','Failed: '+e.message,'err');
+  }finally{ $('scanBtn').disabled=false; }
+});
+
+const FIELDS=['donor_no','name','address','city','state','zip','phone','email',
+  'contribution','amount','pref_boys','pref_girls','pref_state','company_match','company_name','how_heard','notes'];
+
+function fillForm(f){
+  f=f||{};
+  FIELDS.forEach(k=>{ const el=$('f_'+k); if(el) el.value = f[k]!=null?f[k]:''; });
+  const box=$('flagsBox');
+  if(f.flags && String(f.flags).trim()){
+    box.style.display='block';
+    box.innerHTML='⚠️ AI was unsure about: <b>'+esc(String(f.flags))+'</b> — please double-check.';
+  } else box.style.display='none';
+}
+
+/* ---------- save ---------- */
+$('saveBtn').addEventListener('click',async ()=>{
+  const url=getUrl();
+  if(!url){ setStatus('saveStatus','Set the Apps Script URL in Setup first.','err'); return; }
+  const fields={}; FIELDS.forEach(k=>fields[k]=$('f_'+k).value.trim());
+  if(!fields.name){ setStatus('saveStatus','Name is required before saving.','err'); return; }
+  $('saveBtn').disabled=true;
+  setStatus('saveStatus','<span class="spin"></span>Saving to the sheet…','busy');
+  try{
+    const j = await postJSON(url,{action:'save',fields,scannedBy:getWho(),image:capturedDataUrl,mime:'image/jpeg'});
+    if(!j.ok) throw new Error(j.error||'Save failed');
+    setStatus('saveStatus','Saved ✓  ('+j.rows+' total)','ok');
+    setTimeout(resetIntake,1200);
+  }catch(e){
+    setStatus('saveStatus','Failed: '+e.message,'err');
+  }finally{ $('saveBtn').disabled=false; }
+});
+
+function resetIntake(){
+  capturedDataUrl=null;
+  $('preview').style.display='none'; $('preview').src='';
+  $('captureZone').style.display='block';
+  $('scanRow').style.display='none';
+  $('reviewCard').style.display='none';
+  FIELDS.forEach(k=>{ if($('f_'+k)) $('f_'+k).value=''; });
+  $('f_company_match').value='No';
+  $('flagsBox').style.display='none';
+  setStatus('scanStatus',''); setStatus('saveStatus','');
+  $('fileInput').value='';
+}
+
+/* ---------- records ---------- */
+$('refreshBtn').addEventListener('click',loadRecords);
+async function loadRecords(){
+  const url=getUrl();
+  const tbody=$('recTable').querySelector('tbody');
+  if(!url){ setStatus('recStatus','Set the Apps Script URL in Setup first.','err'); $('recEmpty').style.display='block'; return; }
+  setStatus('recStatus','<span class="spin"></span>Loading…','busy');
+  try{
+    const r=await fetch(url+'?action=list&limit=200&_='+Date.now());
+    const j=await r.json();
+    if(!j.ok) throw new Error(j.error||'List failed');
+    const rows=j.rows||[];
+    if(!rows.length){ tbody.innerHTML=''; $('recEmpty').style.display='block'; setStatus('recStatus',''); return; }
+    $('recEmpty').style.display='none';
+    const cols=['Timestamp','Name','Contribution','Amount','City','State','Phone','Email','Scanned By'];
+    let html='<tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
+    rows.forEach(row=>{
+      html+='<tr>'+cols.map(c=>{
+        let v=row[c]; if(c==='Timestamp'&&v) v=new Date(v).toLocaleString();
+        return `<td>${esc(v==null?'':String(v))}</td>`;
+      }).join('')+'</tr>';
+    });
+    tbody.innerHTML=html;
+    setStatus('recStatus',rows.length+' record'+(rows.length>1?'s':''),'ok');
+  }catch(e){
+    setStatus('recStatus','Failed: '+e.message,'err'); $('recEmpty').style.display='block';
+  }
+}
+
+/* ---------- helpers ---------- */
+async function postJSON(url,obj){
+  // text/plain avoids a CORS preflight against Apps Script
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(obj)});
+  return r.json();
+}
+function setStatus(id,msg,kind){ const el=$(id); el.className='status'+(kind?' '+kind:''); el.innerHTML=msg||''; }
+function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+</script>
+</body>
+</html>
