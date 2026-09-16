@@ -231,47 +231,51 @@ function callVisionModel(p, dataUrl) {
 }
 
 function savePledge(body) {
-  var sheet = getSheet();
   var f = normalizeFields(body.fields || {});
   var scannedBy = String(body.scannedBy || '').trim();
 
-  // Auto-assign a donor number only when the card didn't have one written in.
-  var autoNumber = false;
-  if (!f.donor_no) { f.donor_no = nextDonorNo(); autoNumber = true; }
-
+  // Archive the image FIRST, outside the lock — it's the slow part, and we
+  // don't want to hold up other volunteers' saves while Drive works.
   var imageLink = '';
   if (body.image) {
     imageLink = archiveImage(toDataUrl(body.image, body.mime), body.mime, f.name);
   }
 
-  sheet.appendRow(rowFromRecord({
-    timestamp: new Date(),
-    scannedBy: scannedBy,
-    fields: f,
-    imageLink: imageLink
-  }));
+  // Serialize the number bump + row append so 10-12 parallel saves can never
+  // reuse a donor number or clobber each other's row. The locked part is fast.
+  var autoNumber = false, rows = 0;
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    if (!f.donor_no) { f.donor_no = bumpDonorNo(); autoNumber = true; }
+    var sheet = getSheet();
+    sheet.appendRow(rowFromRecord({
+      timestamp: new Date(),
+      scannedBy: scannedBy,
+      fields: f,
+      imageLink: imageLink
+    }));
+    SpreadsheetApp.flush();               // commit the write before releasing the lock
+    rows = Math.max(0, sheet.getLastRow() - 1);
+  } finally {
+    lock.releaseLock();
+  }
   return {
-    ok: true, saved: true, rows: Math.max(0, sheet.getLastRow() - 1),
+    ok: true, saved: true, rows: rows,
     donorNo: f.donor_no, autoNumber: autoNumber, imageLink: imageLink
   };
 }
 
-// Next sequential donor number. Configurable via Script Properties:
-//   DONOR_START  (first number, default 1001)   DONOR_PREFIX (e.g. "SAC-", default "")
-// A script lock keeps concurrent volunteers from grabbing the same number.
-function nextDonorNo() {
+// Increment and return the next donor number. Caller MUST already hold the
+// script lock (savePledge does). Configurable via Script Properties:
+//   DONOR_START (first number, default 1001)   DONOR_PREFIX (e.g. "SAC-")
+function bumpDonorNo() {
   var props = PropertiesService.getScriptProperties();
-  var lock = LockService.getScriptLock();
-  lock.waitLock(15000);
-  try {
-    var start = parseInt(props.getProperty('DONOR_START') || '1001', 10);
-    var cur = props.getProperty('DONOR_SEQ');
-    var n = cur ? parseInt(cur, 10) + 1 : start;
-    props.setProperty('DONOR_SEQ', String(n));
-    return (props.getProperty('DONOR_PREFIX') || '') + n;
-  } finally {
-    lock.releaseLock();
-  }
+  var start = parseInt(props.getProperty('DONOR_START') || '1001', 10);
+  var cur = props.getProperty('DONOR_SEQ');
+  var n = cur ? parseInt(cur, 10) + 1 : start;
+  props.setProperty('DONOR_SEQ', String(n));
+  return (props.getProperty('DONOR_PREFIX') || '') + n;
 }
 
 function listPledges(e) {
