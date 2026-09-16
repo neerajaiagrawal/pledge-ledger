@@ -137,7 +137,7 @@
       <div class="flags" id="flagsBox"></div>
 
       <div class="row">
-        <div><label>Donor No</label><input id="f_donor_no" /></div>
+        <div><label>Donor No <span style="text-transform:none;font-weight:400;color:var(--muted)">(blank = auto)</span></label><input id="f_donor_no" placeholder="auto-assigned" /></div>
         <div><label>Name</label><input id="f_name" /></div>
       </div>
       <label>Address</label><input id="f_address" />
@@ -373,8 +373,9 @@ $('saveBtn').addEventListener('click',async ()=>{
   try{
     const j = await postJSON(url,{action:'save',fields,scannedBy:getWho(),image:capturedDataUrl,mime:'image/jpeg'});
     if(!j.ok) throw new Error(j.error||'Save failed');
-    setStatus('saveStatus','Saved ✓  ('+j.rows+' total)','ok');
-    setTimeout(resetIntake,1200);
+    const donor = j.donorNo ? (j.autoNumber?'  Donor #'+esc(String(j.donorNo))+' (auto)':'  Donor #'+esc(String(j.donorNo))) : '';
+    setStatus('saveStatus','Saved ✓'+donor+'  ('+j.rows+' total)','ok');
+    setTimeout(resetIntake,1800);
   }catch(e){
     setStatus('saveStatus','Failed: '+e.message,'err');
   }finally{ $('saveBtn').disabled=false; }

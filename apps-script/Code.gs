@@ -25,6 +25,8 @@
  *          AI_PRIMARY       = openai | groq                         // default openai
  *          OPENAI_MODEL     = gpt-4o-mini                                 // default
  *          GROQ_MODEL       = meta-llama/llama-4-scout-17b-16e-instruct   // default
+ *          DONOR_START      = 1001         // first auto donor number (used when a card's Donor No is blank)
+ *          DONOR_PREFIX     = SAC-         // optional prefix on auto donor numbers (default none)
  *          DRIVE_FOLDER_ID  = <a Drive folder id>   // if set, card images are archived there
  *   3. Deploy -> Manage deployments -> edit -> Version: New version -> Deploy
  *      (creates a new version WITHOUT changing the /exec URL). First time:
@@ -215,6 +217,10 @@ function savePledge(body) {
   var f = normalizeFields(body.fields || {});
   var scannedBy = String(body.scannedBy || '').trim();
 
+  // Auto-assign a donor number only when the card didn't have one written in.
+  var autoNumber = false;
+  if (!f.donor_no) { f.donor_no = nextDonorNo(); autoNumber = true; }
+
   var imageLink = '';
   if (body.image) {
     imageLink = archiveImage(toDataUrl(body.image, body.mime), body.mime, f.name);
@@ -226,7 +232,28 @@ function savePledge(body) {
     fields: f,
     imageLink: imageLink
   }));
-  return { ok: true, saved: true, rows: Math.max(0, sheet.getLastRow() - 1), imageLink: imageLink };
+  return {
+    ok: true, saved: true, rows: Math.max(0, sheet.getLastRow() - 1),
+    donorNo: f.donor_no, autoNumber: autoNumber, imageLink: imageLink
+  };
+}
+
+// Next sequential donor number. Configurable via Script Properties:
+//   DONOR_START  (first number, default 1001)   DONOR_PREFIX (e.g. "SAC-", default "")
+// A script lock keeps concurrent volunteers from grabbing the same number.
+function nextDonorNo() {
+  var props = PropertiesService.getScriptProperties();
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    var start = parseInt(props.getProperty('DONOR_START') || '1001', 10);
+    var cur = props.getProperty('DONOR_SEQ');
+    var n = cur ? parseInt(cur, 10) + 1 : start;
+    props.setProperty('DONOR_SEQ', String(n));
+    return (props.getProperty('DONOR_PREFIX') || '') + n;
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function listPledges(e) {

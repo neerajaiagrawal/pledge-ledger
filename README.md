@@ -24,9 +24,13 @@ No server to run and no build step: `index.html` is a static page you host anywh
    - `OPENAI_API_KEY` = your OpenAI key  *(primary)*
    - `GROQ_API_KEY` = your Groq key  *(fallback)*
    - `AI_PRIMARY` = `openai` or `groq`  *(optional; default `openai` — flip the order live, no redeploy)*
-   - `OPENAI_MODEL` = `gpt-4o-mini`  *(optional; default)*
+   - `OPENAI_MODEL` = `gpt-4o-mini`  *(optional; default. Use `gpt-4o` for tougher handwriting)*
    - `GROQ_MODEL` = `meta-llama/llama-4-scout-17b-16e-instruct`  *(optional; default)*
+   - `DONOR_START` = `1001`  *(optional; first auto-assigned Donor No when a card's is blank)*
+   - `DONOR_PREFIX` = `SAC-`  *(optional; prefix on auto Donor numbers, e.g. `SAC-1001`)*
    - `DRIVE_FOLDER_ID` = a Drive folder id  *(optional; archives each card image and links it in the sheet)*
+
+**Donor numbering:** if the card's Donor No is left blank, the backend assigns the next sequential number (with a lock so simultaneous scans never reuse one). A number written on the card is kept as-is. The assigned number is shown after saving and stored in the sheet.
 
 At least one of `OPENAI_API_KEY` / `GROQ_API_KEY` is required; set both for automatic failover.
 5. **Deploy → New deployment → Web app**
