@@ -3,10 +3,11 @@
  * ------------------------------------------------
  * Deploy this as a Web App and paste its URL into the Setup tab of the page.
  *
- * AI card reader: Groq (primary) with OpenAI fallback. Both use the
+ * AI card reader: OpenAI (primary) with Groq fallback. Both use the
  * OpenAI-compatible chat/vision API, so the same code path calls either one.
- * If Groq fails (rate limit, outage, model rename), it automatically retries
- * with OpenAI.
+ * If the primary fails (rate limit, outage, model rename), it automatically
+ * retries with the other. Flip the order live with the AI_PRIMARY property
+ * ('openai' or 'groq') — no code change needed.
  *
  * What it does:
  *   - action=ping  : health check, returns sheet + provider status
@@ -15,14 +16,15 @@
  *   - action=list  : returns recent pledge rows for the Records tab
  *
  * ONE-TIME SETUP
- *   1. Get a FREE Groq key: https://console.groq.com/keys  (no billing needed)
- *      (optional) OpenAI fallback key: https://platform.openai.com/api-keys
+ *   1. OpenAI key (primary): https://platform.openai.com/api-keys  (needs billing; ~$0.30 for 500 scans on gpt-4o-mini)
+ *      FREE Groq key (fallback): https://console.groq.com/keys      (no billing needed)
  *   2. In this editor: Project Settings (gear) -> Script Properties -> Add:
- *          GROQ_API_KEY     = <your groq key>                       // primary
- *          OPENAI_API_KEY   = <your openai key>                     // optional fallback
+ *          OPENAI_API_KEY   = <your openai key>                     // primary
+ *          GROQ_API_KEY     = <your groq key>                       // fallback
  *      (optional overrides)
- *          GROQ_MODEL       = meta-llama/llama-4-scout-17b-16e-instruct   // default
+ *          AI_PRIMARY       = openai | groq                         // default openai
  *          OPENAI_MODEL     = gpt-4o-mini                                 // default
+ *          GROQ_MODEL       = meta-llama/llama-4-scout-17b-16e-instruct   // default
  *          DRIVE_FOLDER_ID  = <a Drive folder id>   // if set, card images are archived there
  *   3. Deploy -> Manage deployments -> edit -> Version: New version -> Deploy
  *      (creates a new version WITHOUT changing the /exec URL). First time:
@@ -85,10 +87,11 @@ function ping() {
     spreadsheet: SpreadsheetApp.getActiveSpreadsheet().getName(),
     sheet: SHEET_NAME,
     rows: count,
-    groqKey: props.getProperty('GROQ_API_KEY') ? 'set' : 'MISSING',
+    primary: (props.getProperty('AI_PRIMARY') || 'openai').toLowerCase(),
     openaiKey: props.getProperty('OPENAI_API_KEY') ? 'set' : 'not set',
-    groqModel: props.getProperty('GROQ_MODEL') || DEFAULT_GROQ_MODEL,
+    groqKey: props.getProperty('GROQ_API_KEY') ? 'set' : 'not set',
     openaiModel: props.getProperty('OPENAI_MODEL') || DEFAULT_OPENAI_MODEL,
+    groqModel: props.getProperty('GROQ_MODEL') || DEFAULT_GROQ_MODEL,
     driveArchive: props.getProperty('DRIVE_FOLDER_ID') ? 'on' : 'off',
     time: new Date().toISOString()
   };
@@ -100,26 +103,30 @@ function scanCard(body) {
   var dataUrl = toDataUrl(String(body.image || ''), body.mime || 'image/jpeg');
   if (!dataUrl) return { ok: false, error: 'No image provided.' };
 
-  // Provider chain: Groq first, then OpenAI.
-  var chain = [];
-  if (props.getProperty('GROQ_API_KEY')) {
-    chain.push({
-      name: 'groq',
-      url: 'https://api.groq.com/openai/v1/chat/completions',
-      key: props.getProperty('GROQ_API_KEY'),
-      model: props.getProperty('GROQ_MODEL') || DEFAULT_GROQ_MODEL
-    });
-  }
-  if (props.getProperty('OPENAI_API_KEY')) {
-    chain.push({
+  // Provider chain. Order is set by AI_PRIMARY ('openai' or 'groq'); default 'openai'.
+  var providers = {
+    openai: {
       name: 'openai',
       url: 'https://api.openai.com/v1/chat/completions',
       key: props.getProperty('OPENAI_API_KEY'),
       model: props.getProperty('OPENAI_MODEL') || DEFAULT_OPENAI_MODEL
-    });
-  }
+    },
+    groq: {
+      name: 'groq',
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      key: props.getProperty('GROQ_API_KEY'),
+      model: props.getProperty('GROQ_MODEL') || DEFAULT_GROQ_MODEL
+    }
+  };
+  var primary = (props.getProperty('AI_PRIMARY') || 'openai').toLowerCase();
+  var order = primary === 'groq' ? ['groq', 'openai'] : ['openai', 'groq'];
+
+  var chain = order
+    .map(function (n) { return providers[n]; })
+    .filter(function (p) { return p && p.key; });
+
   if (!chain.length) {
-    return { ok: false, error: 'No AI key set. Add GROQ_API_KEY (and optionally OPENAI_API_KEY) in Script Properties.' };
+    return { ok: false, error: 'No AI key set. Add OPENAI_API_KEY and/or GROQ_API_KEY in Script Properties.' };
   }
 
   var errors = [];

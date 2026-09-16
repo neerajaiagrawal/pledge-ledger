@@ -1,6 +1,6 @@
 # SAC Pledge Ledger
 
-Scan a handwritten **Support A Child** pledge card with your phone → AI reads it (Groq, with OpenAI fallback) → you review → it saves to a Google Sheet. Every saved pledge shows up in the Records tab, straight from the sheet.
+Scan a handwritten **Support A Child** pledge card with your phone → AI reads it (OpenAI, with Groq fallback) → you review → it saves to a Google Sheet. Every saved pledge shows up in the Records tab, straight from the sheet.
 
 No server to run and no build step: `index.html` is a static page you host anywhere (e.g. GitHub Pages, like the prototype), and a Google Apps Script web app is the backend. The AI API keys live in Apps Script — they never touch the phone.
 
@@ -18,14 +18,17 @@ No server to run and no build step: `index.html` is a static page you host anywh
 
 1. **Create a Google Sheet.**
 2. In it: **Extensions → Apps Script**. Delete the sample code and paste all of [`apps-script/Code.gs`](apps-script/Code.gs).
-3. Get a **free Groq API key** (no billing): https://console.groq.com/keys
-   Optionally an **OpenAI key** for fallback: https://platform.openai.com/api-keys
+3. Get an **OpenAI API key** (primary; needs billing, ~$0.30 for 500 scans): https://platform.openai.com/api-keys
+   And a **free Groq key** (fallback, no billing): https://console.groq.com/keys
 4. In Apps Script: **Project Settings (⚙) → Script Properties → Add script property**
-   - `GROQ_API_KEY` = your Groq key  *(primary; required)*
-   - `OPENAI_API_KEY` = your OpenAI key  *(optional fallback)*
-   - `GROQ_MODEL` = `meta-llama/llama-4-scout-17b-16e-instruct`  *(optional; default)*
+   - `OPENAI_API_KEY` = your OpenAI key  *(primary)*
+   - `GROQ_API_KEY` = your Groq key  *(fallback)*
+   - `AI_PRIMARY` = `openai` or `groq`  *(optional; default `openai` — flip the order live, no redeploy)*
    - `OPENAI_MODEL` = `gpt-4o-mini`  *(optional; default)*
+   - `GROQ_MODEL` = `meta-llama/llama-4-scout-17b-16e-instruct`  *(optional; default)*
    - `DRIVE_FOLDER_ID` = a Drive folder id  *(optional; archives each card image and links it in the sheet)*
+
+At least one of `OPENAI_API_KEY` / `GROQ_API_KEY` is required; set both for automatic failover.
 5. **Deploy → New deployment → Web app**
    - Execute as: **Me**
    - Who has access: **Anyone**

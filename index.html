@@ -291,9 +291,10 @@ $('testBtn').addEventListener('click',async ()=>{
       kv('Spreadsheet', esc(j.spreadsheet)) +
       kv('Sheet', esc(j.sheet)) +
       kv('Saved pledges', j.rows) +
-      kv('Groq key', j.groqKey==='set'?'<span class="badge b-ok">set</span>':'<span class="badge b-err">MISSING</span>') +
-      kv('OpenAI fallback', j.openaiKey==='set'?'<span class="badge b-ok">set</span>':'<span class="badge b-idle">not set</span>') +
-      kv('Primary model', esc(j.groqModel)) +
+      kv('Primary', '<b>'+esc(j.primary||'openai')+'</b>') +
+      kv('OpenAI key', j.openaiKey==='set'?'<span class="badge b-ok">set</span>':'<span class="badge b-idle">not set</span>') +
+      kv('Groq key', j.groqKey==='set'?'<span class="badge b-ok">set</span>':'<span class="badge b-idle">not set</span>') +
+      kv('OpenAI model', esc(j.openaiModel)) +
       kv('Drive archive', j.driveArchive);
   }catch(e){
     setStatus('cfgStatus','Failed: '+e.message+'. Check the URL is the /exec link and access is "Anyone".','err');
