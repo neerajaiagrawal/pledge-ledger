@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SAC Volunteer Quick Guide</title>
+<style>
+  :root{ --blue:#1f4e9c; --blue-d:#173a75; --orange:#e8792b; --ink:#1a2233; --muted:#5a6680; --line:#d8dfea; --ok:#1a7f4b; --warn:#b26a00; }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; color:var(--ink); background:#eef1f7; line-height:1.4; }
+  .sheet{ max-width:800px; margin:20px auto; background:#fff; padding:26px 30px; box-shadow:0 4px 20px rgba(20,40,90,.1); border-radius:10px; }
+  header{ display:flex; align-items:center; gap:14px; border-bottom:3px solid var(--blue); padding-bottom:14px; margin-bottom:18px; }
+  .logo{ width:52px;height:52px;border-radius:10px;background:var(--orange);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:19px;flex:0 0 auto; }
+  h1{ font-size:22px; margin:0; color:var(--blue); }
+  header p{ margin:2px 0 0; font-size:13px; color:var(--muted); }
+  .cols{ display:grid; grid-template-columns:1.35fr 1fr; gap:22px; }
+  h2{ font-size:14px; text-transform:uppercase; letter-spacing:.5px; color:var(--blue); margin:0 0 10px; }
+  ol.steps{ margin:0; padding:0; list-style:none; counter-reset:s; }
+  ol.steps li{ counter-increment:s; position:relative; padding:0 0 14px 40px; }
+  ol.steps li::before{ content:counter(s); position:absolute; left:0; top:-2px; width:27px;height:27px; background:var(--blue); color:#fff; border-radius:50%; display:flex;align-items:center;justify-content:center; font-weight:700; font-size:14px; }
+  ol.steps li b{ display:block; font-size:15px; }
+  ol.steps li span{ font-size:13px; color:var(--muted); }
+  .box{ background:#f4f6fb; border:1px solid var(--line); border-radius:9px; padding:12px 14px; margin-bottom:14px; }
+  .box h3{ margin:0 0 7px; font-size:13px; color:var(--ink); }
+  .box ul{ margin:0; padding-left:18px; font-size:12.5px; color:var(--muted); }
+  .box ul li{ margin:4px 0; }
+  .tip{ border-left:4px solid var(--ok); }
+  .warn{ border-left:4px solid var(--warn); }
+  .photo-do{ display:flex; gap:10px; margin-bottom:14px; }
+  .chip{ flex:1; text-align:center; font-size:12px; padding:8px 4px; border-radius:8px; }
+  .chip.good{ background:rgba(26,127,75,.1); color:var(--ok); border:1px solid rgba(26,127,75,.3); }
+  .chip.bad{ background:rgba(192,57,43,.08); color:#c0392b; border:1px solid rgba(192,57,43,.25); }
+  footer{ margin-top:16px; border-top:1px solid var(--line); padding-top:10px; font-size:11.5px; color:var(--muted); display:flex; justify-content:space-between; gap:10px; }
+  .open{ background:var(--blue); color:#fff; border-radius:9px; padding:12px 14px; margin-bottom:16px; }
+  .open b{ font-size:15px; } .open p{ margin:4px 0 0; font-size:12.5px; opacity:.9; }
+  @media print{
+    body{ background:#fff; } .sheet{ box-shadow:none; margin:0; max-width:none; border-radius:0; padding:12px 16px; }
+    .no-print{ display:none; }
+    @page{ margin:12mm; }
+  }
+  @media(max-width:640px){ .cols{ grid-template-columns:1fr; } }
+  .printbtn{ display:block; max-width:800px; margin:14px auto 0; text-align:right; }
+  .printbtn button{ font:inherit; font-weight:600; background:var(--blue); color:#fff; border:none; border-radius:8px; padding:9px 16px; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="printbtn no-print"><button onclick="window.print()">🖨️ Print this sheet</button></div>
+<div class="sheet">
+  <header>
+    <div class="logo">SAC</div>
+    <div>
+      <h1>Pledge Ledger — Volunteer Quick Guide</h1>
+      <p>Scan a completed pledge card → check it → save. About 15 seconds per card.</p>
+    </div>
+  </header>
+
+  <div class="open">
+    <b>1. Open the app link the coordinator shared with you</b>
+    <p>Open it on your phone's browser. Go to the <b>⚙ Setup</b> tab and type <b>your name</b> once, then tap <b>Save settings</b>. You only do this once — the app remembers it.</p>
+  </div>
+
+  <div class="cols">
+    <div>
+      <h2>Scan a card</h2>
+      <ol class="steps">
+        <li><b>Tap 📷 Intake</b><span>Then tap the big “Take / choose photo” box — the camera opens.</span></li>
+        <li><b>Photograph the card</b><span>Lay it flat, good light, whole card in the frame. Take the photo.</span></li>
+        <li><b>Tap “✨ Read card with AI”</b><span>Wait a few seconds while it reads the handwriting.</span></li>
+        <li><b>Check the details</b><span>Fix anything wrong. Orange ⚠️ marks fields the AI wasn’t sure about.</span></li>
+        <li><b>Tap “💾 Save to Google Sheet”</b><span>You’ll see “Saved ✓ Donor #…”. That donor number is assigned for you.</span></li>
+        <li><b>Next card</b><span>The form clears itself — just start again from Intake.</span></li>
+      </ol>
+    </div>
+
+    <div>
+      <h2>Good photo</h2>
+      <div class="photo-do">
+        <div class="chip good">✔ Flat<br>✔ Bright<br>✔ All corners</div>
+        <div class="chip bad">✗ Angled<br>✗ Shadow<br>✗ Cut off</div>
+      </div>
+
+      <div class="box tip">
+        <h3>Tips</h3>
+        <ul>
+          <li>Leave <b>Donor No blank</b> — the app numbers it automatically.</li>
+          <li>Always glance over the fields before saving — the AI is good, not perfect.</li>
+          <li>Names/handwriting that’s been rewritten may misread — just correct it.</li>
+        </ul>
+      </div>
+
+      <div class="box warn">
+        <h3>If something’s off</h3>
+        <ul>
+          <li><b>“unauthorized”</b> → reopen the coordinator’s link (don’t type the address by hand).</li>
+          <li>Bad read → tap <b>Retake</b> and shoot again in better light.</li>
+          <li>Never type card numbers — the credit-card box is ignored on purpose.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>Support A Child (SAC) · an initiative of World Hindu Council of America (VHPA)</span>
+    <span>Questions? Ask your coordinator.</span>
+  </footer>
+</div>
+</body>
+</html>
