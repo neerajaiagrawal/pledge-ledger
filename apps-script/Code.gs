@@ -3,28 +3,38 @@
  * ------------------------------------------------
  * Deploy this as a Web App and paste its URL into the Setup tab of the page.
  *
+ * AI card reader: Groq (primary) with OpenAI fallback. Both use the
+ * OpenAI-compatible chat/vision API, so the same code path calls either one.
+ * If Groq fails (rate limit, outage, model rename), it automatically retries
+ * with OpenAI.
+ *
  * What it does:
- *   - action=ping  : health check, returns sheet + config status
- *   - action=scan  : reads a pledge-card photo with Google Gemini, returns fields (does NOT save)
+ *   - action=ping  : health check, returns sheet + provider status
+ *   - action=scan  : reads a pledge-card photo with AI, returns fields (does NOT save)
  *   - action=save  : appends a reviewed pledge row to the "Pledges" sheet (optionally saves the image to Drive)
  *   - action=list  : returns recent pledge rows for the Records tab
  *
  * ONE-TIME SETUP
- *   1. Create a Gemini API key: https://aistudio.google.com/apikey
+ *   1. Get a FREE Groq key: https://console.groq.com/keys  (no billing needed)
+ *      (optional) OpenAI fallback key: https://platform.openai.com/api-keys
  *   2. In this editor: Project Settings (gear) -> Script Properties -> Add:
- *          GEMINI_API_KEY   = <your key>
- *      (optional)
- *          GEMINI_MODEL     = gemini-3.6-flash        // default if omitted
- *          DRIVE_FOLDER_ID  = <a Drive folder id>     // if set, card images are archived there
- *   3. Deploy -> New deployment -> type "Web app"
- *          Execute as:  Me
- *          Who has access:  Anyone
- *      Copy the /exec URL into the page's Setup tab.
+ *          GROQ_API_KEY     = <your groq key>                       // primary
+ *          OPENAI_API_KEY   = <your openai key>                     // optional fallback
+ *      (optional overrides)
+ *          GROQ_MODEL       = meta-llama/llama-4-scout-17b-16e-instruct   // default
+ *          OPENAI_MODEL     = gpt-4o-mini                                 // default
+ *          DRIVE_FOLDER_ID  = <a Drive folder id>   // if set, card images are archived there
+ *   3. Deploy -> Manage deployments -> edit -> Version: New version -> Deploy
+ *      (creates a new version WITHOUT changing the /exec URL). First time:
+ *      Deploy -> New deployment -> Web app, Execute as Me, access Anyone.
  *
  * NOTE: credit-card number / CVV / expiry are deliberately never read or stored.
  */
 
 var SHEET_NAME = 'Pledges';
+
+var DEFAULT_GROQ_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+var DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 
 // Column order for the sheet. Keep in sync with HEADERS and rowFromRecord().
 var HEADERS = [
@@ -75,8 +85,10 @@ function ping() {
     spreadsheet: SpreadsheetApp.getActiveSpreadsheet().getName(),
     sheet: SHEET_NAME,
     rows: count,
-    geminiKey: props.getProperty('GEMINI_API_KEY') ? 'set' : 'MISSING',
-    model: props.getProperty('GEMINI_MODEL') || 'gemini-3.6-flash',
+    groqKey: props.getProperty('GROQ_API_KEY') ? 'set' : 'MISSING',
+    openaiKey: props.getProperty('OPENAI_API_KEY') ? 'set' : 'not set',
+    groqModel: props.getProperty('GROQ_MODEL') || DEFAULT_GROQ_MODEL,
+    openaiModel: props.getProperty('OPENAI_MODEL') || DEFAULT_OPENAI_MODEL,
     driveArchive: props.getProperty('DRIVE_FOLDER_ID') ? 'on' : 'off',
     time: new Date().toISOString()
   };
@@ -84,45 +96,75 @@ function ping() {
 
 function scanCard(body) {
   var props = PropertiesService.getScriptProperties();
-  var key = props.getProperty('GEMINI_API_KEY');
-  if (!key) return { ok: false, error: 'GEMINI_API_KEY is not set in Script Properties.' };
-  var model = props.getProperty('GEMINI_MODEL') || 'gemini-3.6-flash';
 
-  var image = String(body.image || '');
-  image = image.replace(/^data:image\/[a-z]+;base64,/i, '');
-  if (!image) return { ok: false, error: 'No image provided.' };
-  var mime = body.mime || 'image/jpeg';
+  var dataUrl = toDataUrl(String(body.image || ''), body.mime || 'image/jpeg');
+  if (!dataUrl) return { ok: false, error: 'No image provided.' };
 
-  var prompt =
-    'You are reading a handwritten "Support A Child (SAC)" pledge card. ' +
-    'Extract the donor-entered information into JSON. Read handwriting carefully. ' +
-    'If a field is blank or unreadable, use an empty string. ' +
-    'For "contribution", return the printed tier that is checked/marked, one of exactly: ' +
+  // Provider chain: Groq first, then OpenAI.
+  var chain = [];
+  if (props.getProperty('GROQ_API_KEY')) {
+    chain.push({
+      name: 'groq',
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      key: props.getProperty('GROQ_API_KEY'),
+      model: props.getProperty('GROQ_MODEL') || DEFAULT_GROQ_MODEL
+    });
+  }
+  if (props.getProperty('OPENAI_API_KEY')) {
+    chain.push({
+      name: 'openai',
+      url: 'https://api.openai.com/v1/chat/completions',
+      key: props.getProperty('OPENAI_API_KEY'),
+      model: props.getProperty('OPENAI_MODEL') || DEFAULT_OPENAI_MODEL
+    });
+  }
+  if (!chain.length) {
+    return { ok: false, error: 'No AI key set. Add GROQ_API_KEY (and optionally OPENAI_API_KEY) in Script Properties.' };
+  }
+
+  var errors = [];
+  for (var i = 0; i < chain.length; i++) {
+    var p = chain[i];
+    var r = callVisionModel(p, dataUrl);
+    if (r.ok) {
+      var fields = normalizeFields(r.fields);
+      return { ok: true, fields: fields, provider: p.name, model: p.model };
+    }
+    errors.push(p.name + ': ' + r.error);
+  }
+  return { ok: false, error: 'All providers failed — ' + errors.join(' | ') };
+}
+
+function callVisionModel(p, dataUrl) {
+  var system =
+    'You read handwritten "Support A Child (SAC)" donation pledge cards and return JSON only. ' +
+    'Read handwriting carefully. For any blank or unreadable field use an empty string. ' +
+    'For "contribution" return the printed tier that is checked/marked, exactly one of: ' +
     '"One Child $250", "Two Children $500", "Three Children $750", "Five Children $1,250", ' +
-    '"One Child for 12 years $2,500", or "Any Amount". If only "Any Amount" is filled, put that. ' +
-    'For "amount", return the dollar figure implied by the checked tier or written in "Any Amount", digits only. ' +
-    'IMPORTANT: Do NOT read, guess, or output any credit-card number, CVV, or expiry date. ' +
-    'Add a "flags" array listing any field that is uncertain or that you could not read. ' +
-    'Return ONLY JSON with these keys: donor_no, name, address, city, state, zip, phone, email, ' +
+    '"One Child for 12 years $2,500", or "Any Amount". ' +
+    'For "amount" return the dollar figure implied by the checked tier or written under "Any Amount", digits only. ' +
+    'NEVER read, guess, or output any credit-card number, CVV, or expiry date — ignore that section entirely. ' +
+    'Include a "flags" array naming any field you were unsure about or could not read. ' +
+    'Return ONLY a JSON object with these keys: donor_no, name, address, city, state, zip, phone, email, ' +
     'contribution, amount, pref_boys, pref_girls, pref_state, company_match (true/false), ' +
     'company_name, how_heard, notes, flags.';
 
   var payload = {
-    contents: [{
-      parts: [
-        { text: prompt },
-        { inline_data: { mime_type: mime, data: image } }
-      ]
-    }],
-    generationConfig: { temperature: 0, response_mime_type: 'application/json' }
+    model: p.model,
+    temperature: 0,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: [
+        { type: 'text', text: 'Extract the donor-entered information from this pledge card as JSON.' },
+        { type: 'image_url', image_url: { url: dataUrl } }
+      ] }
+    ]
   };
 
-  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
-    encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(key);
-
-  var resp = UrlFetchApp.fetch(url, {
+  var resp = UrlFetchApp.fetch(p.url, {
     method: 'post',
     contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + p.key },
     payload: JSON.stringify(payload),
     muteHttpExceptions: true
   });
@@ -130,19 +172,19 @@ function scanCard(body) {
   var code = resp.getResponseCode();
   var text = resp.getContentText();
   if (code !== 200) {
-    return { ok: false, error: 'Gemini error ' + code + ': ' + text.slice(0, 500) };
+    return { ok: false, error: 'HTTP ' + code + ': ' + text.slice(0, 300) };
   }
 
-  var out;
+  var content;
   try {
-    var data = JSON.parse(text);
-    var raw = data.candidates[0].content.parts[0].text;
-    out = JSON.parse(raw);
+    content = JSON.parse(text).choices[0].message.content;
   } catch (err) {
-    return { ok: false, error: 'Could not parse Gemini response: ' + String(err) };
+    return { ok: false, error: 'Unexpected response shape: ' + text.slice(0, 200) };
   }
 
-  return { ok: true, fields: normalizeFields(out) };
+  var fields = extractJson(content);
+  if (!fields) return { ok: false, error: 'Model did not return JSON.' };
+  return { ok: true, fields: fields };
 }
 
 function savePledge(body) {
@@ -152,16 +194,15 @@ function savePledge(body) {
 
   var imageLink = '';
   if (body.image) {
-    imageLink = archiveImage(body.image, body.mime, f.name);
+    imageLink = archiveImage(toDataUrl(body.image, body.mime), body.mime, f.name);
   }
 
-  var record = {
+  sheet.appendRow(rowFromRecord({
     timestamp: new Date(),
     scannedBy: scannedBy,
     fields: f,
     imageLink: imageLink
-  };
-  sheet.appendRow(rowFromRecord(record));
+  }));
   return { ok: true, saved: true, rows: Math.max(0, sheet.getLastRow() - 1), imageLink: imageLink };
 }
 
@@ -183,6 +224,23 @@ function listPledges(e) {
 }
 
 /* --------------------------------- helpers ---------------------------------- */
+
+// Ensure a full data URL (OpenAI-compatible image_url wants data:...;base64,....)
+function toDataUrl(image, mime) {
+  image = String(image || '').trim();
+  if (!image) return '';
+  if (/^data:image\//i.test(image)) return image;
+  return 'data:' + (mime || 'image/jpeg') + ';base64,' + image;
+}
+
+// Pull the first {...} JSON object out of a model reply (handles code fences / stray text).
+function extractJson(s) {
+  s = String(s || '');
+  try { return JSON.parse(s); } catch (e) {}
+  var a = s.indexOf('{'), b = s.lastIndexOf('}');
+  if (a === -1 || b === -1 || b <= a) return null;
+  try { return JSON.parse(s.slice(a, b + 1)); } catch (e) { return null; }
+}
 
 function normalizeFields(o) {
   o = o || {};

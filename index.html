@@ -223,8 +223,8 @@
       <ol>
         <li>Create a Google Sheet.</li>
         <li>In it: <b>Extensions → Apps Script</b>. Delete any code, paste the contents of <code>apps-script/Code.gs</code>.</li>
-        <li>Get a free Gemini key at <code>aistudio.google.com/apikey</code>.</li>
-        <li>In Apps Script: <b>Project Settings (⚙) → Script Properties</b> → add <code>GEMINI_API_KEY</code> = your key.</li>
+        <li>Get a free Groq key at <code>console.groq.com/keys</code> (optionally an OpenAI key at <code>platform.openai.com/api-keys</code> for fallback).</li>
+        <li>In Apps Script: <b>Project Settings (⚙) → Script Properties</b> → add <code>GROQ_API_KEY</code> = your key (and <code>OPENAI_API_KEY</code> for fallback).</li>
         <li><b>Deploy → New deployment → Web app</b>. Execute as <b>Me</b>, access <b>Anyone</b>. Copy the <code>/exec</code> URL.</li>
         <li>Paste that URL above and press <b>Test connection</b>.</li>
       </ol>
@@ -291,8 +291,9 @@ $('testBtn').addEventListener('click',async ()=>{
       kv('Spreadsheet', esc(j.spreadsheet)) +
       kv('Sheet', esc(j.sheet)) +
       kv('Saved pledges', j.rows) +
-      kv('Gemini key', j.geminiKey==='set'?'<span class="badge b-ok">set</span>':'<span class="badge b-err">MISSING</span>') +
-      kv('Model', esc(j.model)) +
+      kv('Groq key', j.groqKey==='set'?'<span class="badge b-ok">set</span>':'<span class="badge b-err">MISSING</span>') +
+      kv('OpenAI fallback', j.openaiKey==='set'?'<span class="badge b-ok">set</span>':'<span class="badge b-idle">not set</span>') +
+      kv('Primary model', esc(j.groqModel)) +
       kv('Drive archive', j.driveArchive);
   }catch(e){
     setStatus('cfgStatus','Failed: '+e.message+'. Check the URL is the /exec link and access is "Anyone".','err');
