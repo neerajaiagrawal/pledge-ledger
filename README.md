@@ -32,6 +32,14 @@ No server to run and no build step: `index.html` is a static page you host anywh
 
 **Donor numbering:** if the card's Donor No is left blank, the backend assigns the next sequential number (with a lock so simultaneous scans never reuse one). A number written on the card is kept as-is. The assigned number is shown after saving and stored in the sheet.
 
+**Access token (share safely):** the `/exec` URL is baked into the page, so sharing the link auto-connects volunteers. To stop strangers using your open endpoint, set a Script Property `ACCESS_TOKEN` = a secret string. Then every request must carry that token, and you share the app as:
+
+```
+https://neerajagrawal.org/pledge-ledger/#t=YOUR_SECRET
+```
+
+The page reads the token from the `#t=` hash, saves it on that device, and strips it from the visible URL. Requests without the right token get `unauthorized`. To revoke everyone, change `ACCESS_TOKEN` and reshare a new link. Leave `ACCESS_TOKEN` unset to keep the endpoint open (no token needed) — you can never lock yourself out by forgetting it.
+
 At least one of `OPENAI_API_KEY` / `GROQ_API_KEY` is required; set both for automatic failover.
 5. **Deploy → New deployment → Web app**
    - Execute as: **Me**

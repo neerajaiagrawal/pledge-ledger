@@ -210,6 +210,8 @@
       <input id="cfgUrl" placeholder="https://script.google.com/macros/s/…/exec" />
       <label>Scanned by (your name)</label>
       <input id="cfgWho" placeholder="e.g. Neeraj" />
+      <label>Access token <span style="text-transform:none;font-weight:400;color:var(--muted)">(auto-filled from your link)</span></label>
+      <input id="cfgToken" placeholder="from the #t=… share link" />
       <div class="btn-row">
         <button class="btn-ghost" id="testBtn">🔌 Test connection</button>
         <button class="btn-primary" id="saveCfgBtn">Save settings</button>
@@ -248,8 +250,26 @@
 
 <script>
 const $ = id => document.getElementById(id);
-const LS = { url:'sac_appsurl', who:'sac_scannedby' };
+const LS = { url:'sac_appsurl', who:'sac_scannedby', token:'sac_token' };
+
+// Baked-in default so a shared link is pre-connected (volunteers only add their name).
+// Not secret — the ACCESS_TOKEN below is what actually gates the endpoint.
+const DEFAULT_APPS_URL = 'https://script.google.com/macros/s/AKfycbxCUosmrK_43RUnzH7aLoSQBK8SJ53VUwZ0kD6SzojCzQCTeWnMNPwh_z2SeUnWymC3/exec';
+
 let capturedDataUrl = null;
+
+// Access token arrives in the share link's hash: .../pledge-ledger/#t=SECRET
+// Read it once, store it on this device, then strip it from the visible URL.
+(function readTokenFromHash(){
+  try{
+    const h = location.hash || '';
+    const m = h.match(/[#&]t=([^&]+)/);
+    if(m){
+      localStorage.setItem(LS.token, decodeURIComponent(m[1]));
+      history.replaceState(null,'',location.pathname+location.search);
+    }
+  }catch(e){}
+})();
 
 /* ---------- tabs ---------- */
 document.querySelectorAll('nav.tabs button').forEach(b=>{
@@ -263,14 +283,18 @@ document.querySelectorAll('nav.tabs button').forEach(b=>{
 });
 
 /* ---------- config ---------- */
-function getUrl(){ return (localStorage.getItem(LS.url)||'').trim(); }
+function getUrl(){ return (localStorage.getItem(LS.url)||DEFAULT_APPS_URL||'').trim(); }
 function getWho(){ return (localStorage.getItem(LS.who)||'').trim(); }
+function getToken(){ return (localStorage.getItem(LS.token)||'').trim(); }
+function withToken(url){ const t=getToken(); return t ? url+'&token='+encodeURIComponent(t) : url; }
 $('cfgUrl').value = getUrl();
 $('cfgWho').value = getWho();
+$('cfgToken').value = getToken();
 
 $('saveCfgBtn').addEventListener('click',()=>{
   localStorage.setItem(LS.url,$('cfgUrl').value.trim());
   localStorage.setItem(LS.who,$('cfgWho').value.trim());
+  localStorage.setItem(LS.token,$('cfgToken').value.trim());
   setStatus('cfgStatus','Settings saved.','ok');
 });
 
@@ -279,18 +303,20 @@ $('testBtn').addEventListener('click',async ()=>{
   if(!url){ setStatus('cfgStatus','Enter the web-app URL first.','err'); return; }
   localStorage.setItem(LS.url,url);
   localStorage.setItem(LS.who,$('cfgWho').value.trim());
+  localStorage.setItem(LS.token,$('cfgToken').value.trim());
   setStatus('cfgStatus','Testing…','busy');
   $('pingInfo').innerHTML='';
   try{
-    const r = await fetch(url+'?action=ping&_='+Date.now());
+    const r = await fetch(withToken(url+'?action=ping&_='+Date.now()));
     const j = await r.json();
-    if(!j.ok) throw new Error(j.error||'Unknown error');
+    if(!j.ok) throw new Error(j.error==='unauthorized'?'unauthorized — access token missing or wrong':(j.error||'Unknown error'));
     setStatus('cfgStatus','Connected ✓','ok');
     const kv = (k,v)=>`<div class="kv"><span>${k}</span><span>${v}</span></div>`;
     $('pingInfo').innerHTML =
       kv('Spreadsheet', esc(j.spreadsheet)) +
       kv('Sheet', esc(j.sheet)) +
       kv('Saved pledges', j.rows) +
+      kv('Access token', j.tokenRequired?'<span class="badge b-ok">required</span>':'<span class="badge b-warn">open</span>') +
       kv('Primary', '<b>'+esc(j.primary||'openai')+'</b>') +
       kv('OpenAI key', j.openaiKey==='set'?'<span class="badge b-ok">set</span>':'<span class="badge b-idle">not set</span>') +
       kv('Groq key', j.groqKey==='set'?'<span class="badge b-ok">set</span>':'<span class="badge b-idle">not set</span>') +
@@ -402,9 +428,9 @@ async function loadRecords(){
   if(!url){ setStatus('recStatus','Set the Apps Script URL in Setup first.','err'); $('recEmpty').style.display='block'; return; }
   setStatus('recStatus','<span class="spin"></span>Loading…','busy');
   try{
-    const r=await fetch(url+'?action=list&limit=200&_='+Date.now());
+    const r=await fetch(withToken(url+'?action=list&limit=200&_='+Date.now()));
     const j=await r.json();
-    if(!j.ok) throw new Error(j.error||'List failed');
+    if(!j.ok) throw new Error(j.error==='unauthorized'?'unauthorized — check your access-token link':(j.error||'List failed'));
     const rows=j.rows||[];
     if(!rows.length){ tbody.innerHTML=''; $('recEmpty').style.display='block'; setStatus('recStatus',''); return; }
     $('recEmpty').style.display='none';
@@ -426,8 +452,11 @@ async function loadRecords(){
 /* ---------- helpers ---------- */
 async function postJSON(url,obj){
   // text/plain avoids a CORS preflight against Apps Script
+  const t=getToken(); if(t) obj={...obj,token:t};
   const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(obj)});
-  return r.json();
+  const j=await r.json();
+  if(j && j.error==='unauthorized') throw new Error('unauthorized — open the app from your access-token link');
+  return j;
 }
 function setStatus(id,msg,kind){ const el=$(id); el.className='status'+(kind?' '+kind:''); el.innerHTML=msg||''; }
 function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }

@@ -27,6 +27,8 @@
  *          GROQ_MODEL       = meta-llama/llama-4-scout-17b-16e-instruct   // default
  *          DONOR_START      = 1001         // first auto donor number (used when a card's Donor No is blank)
  *          DONOR_PREFIX     = SAC-         // optional prefix on auto donor numbers (default none)
+ *          ACCESS_TOKEN     = <secret>     // if set, requests must carry ?token= / body.token that matches.
+ *                                          // Share the page as .../pledge-ledger/#t=<secret>. Change it to revoke.
  *          DRIVE_FOLDER_ID  = <a Drive folder id>   // if set, card images are archived there
  *   3. Deploy -> Manage deployments -> edit -> Version: New version -> Deploy
  *      (creates a new version WITHOUT changing the /exec URL). First time:
@@ -49,8 +51,20 @@ var HEADERS = [
 
 /* ------------------------------ HTTP entry points ------------------------------ */
 
+// If ACCESS_TOKEN is set in Script Properties, every request must carry a
+// matching token (GET ?token=... or POST body.token). If it is NOT set, the
+// endpoint is open (so you can never lock yourself out by forgetting it).
+function authOk(provided) {
+  var expected = PropertiesService.getScriptProperties().getProperty('ACCESS_TOKEN');
+  if (!expected) return true;               // no token configured => open
+  return String(provided || '') === String(expected);
+}
+
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || 'ping';
+  if (!authOk(e && e.parameter && e.parameter.token)) {
+    return json({ ok: false, error: 'unauthorized' });
+  }
   try {
     if (action === 'list') return json(listPledges(e));
     return json(ping());
@@ -65,6 +79,9 @@ function doPost(e) {
     body = JSON.parse(e.postData.contents || '{}');
   } catch (err) {
     return json({ ok: false, error: 'Bad JSON body' });
+  }
+  if (!authOk(body.token)) {
+    return json({ ok: false, error: 'unauthorized' });
   }
   var action = body.action || '';
   try {
@@ -89,6 +106,7 @@ function ping() {
     spreadsheet: SpreadsheetApp.getActiveSpreadsheet().getName(),
     sheet: SHEET_NAME,
     rows: count,
+    tokenRequired: props.getProperty('ACCESS_TOKEN') ? true : false,
     primary: (props.getProperty('AI_PRIMARY') || 'openai').toLowerCase(),
     openaiKey: props.getProperty('OPENAI_API_KEY') ? 'set' : 'not set',
     groqKey: props.getProperty('GROQ_API_KEY') ? 'set' : 'not set',
