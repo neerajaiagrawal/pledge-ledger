@@ -212,6 +212,7 @@
       <input id="cfgWho" placeholder="e.g. Neeraj" />
       <label>Access token <span style="text-transform:none;font-weight:400;color:var(--muted)">(auto-filled from your link)</span></label>
       <input id="cfgToken" placeholder="from the #t=… share link" />
+      <p class="hint" id="lockNote" style="margin:10px 0 0"></p>
       <div class="btn-row">
         <button class="btn-ghost" id="testBtn">🔌 Test connection</button>
         <button class="btn-primary" id="saveCfgBtn">Save settings</button>
@@ -258,16 +259,18 @@ const DEFAULT_APPS_URL = 'https://script.google.com/macros/s/AKfycbxCUosmrK_43RU
 
 let capturedDataUrl = null;
 
+// Admin edit mode: open the app with #edit to unlock the connection fields.
+let ADMIN_EDIT = false;
+
 // Access token arrives in the share link's hash: .../pledge-ledger/#t=SECRET
 // Read it once, store it on this device, then strip it from the visible URL.
-(function readTokenFromHash(){
+(function readHash(){
   try{
     const h = location.hash || '';
+    if(/[#&]edit\b/.test(h)) ADMIN_EDIT = true;
     const m = h.match(/[#&]t=([^&]+)/);
-    if(m){
-      localStorage.setItem(LS.token, decodeURIComponent(m[1]));
-      history.replaceState(null,'',location.pathname+location.search);
-    }
+    if(m) localStorage.setItem(LS.token, decodeURIComponent(m[1]));
+    if(m || ADMIN_EDIT) history.replaceState(null,'',location.pathname+location.search);
   }catch(e){}
 })();
 
@@ -290,6 +293,19 @@ function withToken(url){ const t=getToken(); return t ? url+'&token='+encodeURIC
 $('cfgUrl').value = getUrl();
 $('cfgWho').value = getWho();
 $('cfgToken').value = getToken();
+
+// Lock the connection fields for volunteers; unlock them only in #edit mode.
+(function applyLock(){
+  const locked = !ADMIN_EDIT;
+  [$('cfgUrl'),$('cfgToken')].forEach(el=>{
+    el.readOnly = locked;
+    el.style.opacity = locked ? '.7' : '1';
+    el.style.cursor = locked ? 'not-allowed' : 'text';
+  });
+  $('lockNote').innerHTML = locked
+    ? '🔒 Connection locked. To change the URL or token, open this app with <code>#edit</code> at the end of the address.'
+    : '🔓 Edit mode — you can change the connection URL and token, then press Save settings.';
+})();
 
 $('saveCfgBtn').addEventListener('click',()=>{
   localStorage.setItem(LS.url,$('cfgUrl').value.trim());

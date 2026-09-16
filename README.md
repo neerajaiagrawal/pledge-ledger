@@ -40,6 +40,14 @@ https://neerajagrawal.org/pledge-ledger/#t=YOUR_SECRET
 
 The page reads the token from the `#t=` hash, saves it on that device, and strips it from the visible URL. Requests without the right token get `unauthorized`. To revoke everyone, change `ACCESS_TOKEN` and reshare a new link. Leave `ACCESS_TOKEN` unset to keep the endpoint open (no token needed) — you can never lock yourself out by forgetting it.
 
+**Locked connection fields:** on the Setup tab the URL and token are **read-only** so volunteers can't accidentally change them (the URL is baked into the page and the token comes from the link, so they never need to). To edit them yourself, open the app with `#edit` at the end of the address:
+
+```
+https://neerajagrawal.org/pledge-ledger/#edit
+```
+
+That unlocks both fields; change them and press **Save settings**. (To change the token everywhere, though, you update `ACCESS_TOKEN` in Apps Script and reshare the `#t=` link — the per-device field is just a local override.)
+
 At least one of `OPENAI_API_KEY` / `GROQ_API_KEY` is required; set both for automatic failover.
 5. **Deploy → New deployment → Web app**
    - Execute as: **Me**
