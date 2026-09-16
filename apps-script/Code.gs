@@ -144,14 +144,30 @@ function scanCard(body) {
 
 function callVisionModel(p, dataUrl) {
   var system =
-    'You read handwritten "Support A Child (SAC)" donation pledge cards and return JSON only. ' +
-    'Read handwriting carefully. For any blank or unreadable field use an empty string. ' +
-    'For "contribution" return the printed tier that is checked/marked, exactly one of: ' +
-    '"One Child $250", "Two Children $500", "Three Children $750", "Five Children $1,250", ' +
-    '"One Child for 12 years $2,500", or "Any Amount". ' +
-    'For "amount" return the dollar figure implied by the checked tier or written under "Any Amount", digits only. ' +
-    'NEVER read, guess, or output any credit-card number, CVV, or expiry date — ignore that section entirely. ' +
-    'Include a "flags" array naming any field you were unsure about or could not read. ' +
+    'You transcribe a handwritten "Support A Child (SAC)" donation pledge card into JSON. Return JSON only.\n\n' +
+    'THE CARD HAS THESE PRINTED LABELS, IN THIS ORDER:\n' +
+    '  "Donor No." (top right, often blank)\n' +
+    '  "Name:"\n' +
+    '  "Address:"  (its own line — frequently left blank)\n' +
+    '  a line with THREE labels together: "City:"  "State:"  "Zip code:"\n' +
+    '  a line with a phone icon then the number, and an envelope icon then the email\n' +
+    '  "Contribution:" with checkboxes: One Child $250, Two Children $500, Three Children $750,\n' +
+    '     Five Children $1,250, One Child for 12 years $2,500, and a blank "Any Amount:" line\n' +
+    '  "Number of Boys", "Number of Girls", "Preference of State"\n' +
+    '  a checkbox "My company will match my donation" and "Company Name:"\n' +
+    '  a credit-card section ("Name on Card", "Card No.", "Card Type", "Exp. Date", "CVV#", "Signature")\n' +
+    '  "How did you hear about SAC"\n\n' +
+    'RULES:\n' +
+    '1. Map each value to the key for the label PRINTED NEXT TO IT. Never shift a value to a different field.\n' +
+    '2. If a labeled line is blank, its value is "" — do NOT fill it with text from another line. ' +
+    'In particular, when "Address:" is blank, leave address "" and still read City/State/Zip from THEIR line.\n' +
+    '3. "state" is the 2-letter US state next to "State:"; "zip" is the number next to "Zip code:". Do not swap them.\n' +
+    '4. For "contribution" return the checked tier, exactly one of: "One Child $250", "Two Children $500", ' +
+    '"Three Children $750", "Five Children $1,250", "One Child for 12 years $2,500", or "Any Amount". ' +
+    'For "amount" return that tier\'s dollar figure (or the number written on the "Any Amount" line), digits only.\n' +
+    '5. NEVER read, guess, or output any credit-card number, card type, CVV, expiry, or signature — ignore that whole section.\n' +
+    '6. Read digits carefully (0/6/8, 1/7/4 are easy to confuse). Preserve the donor\'s spelling of names.\n' +
+    '7. Put the name of ANY field you are unsure about into the "flags" array so a human double-checks it.\n\n' +
     'Return ONLY a JSON object with these keys: donor_no, name, address, city, state, zip, phone, email, ' +
     'contribution, amount, pref_boys, pref_girls, pref_state, company_match (true/false), ' +
     'company_name, how_heard, notes, flags.';
@@ -162,8 +178,8 @@ function callVisionModel(p, dataUrl) {
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: [
-        { type: 'text', text: 'Extract the donor-entered information from this pledge card as JSON.' },
-        { type: 'image_url', image_url: { url: dataUrl } }
+        { type: 'text', text: 'Transcribe this pledge card into the JSON described. Map strictly by printed label; leave blank lines empty.' },
+        { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } }
       ] }
     ]
   };
