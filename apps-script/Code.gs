@@ -14,7 +14,7 @@
  *   2. In this editor: Project Settings (gear) -> Script Properties -> Add:
  *          GEMINI_API_KEY   = <your key>
  *      (optional)
- *          GEMINI_MODEL     = gemini-2.5-flash        // default if omitted
+ *          GEMINI_MODEL     = gemini-3.6-flash        // default if omitted
  *          DRIVE_FOLDER_ID  = <a Drive folder id>     // if set, card images are archived there
  *   3. Deploy -> New deployment -> type "Web app"
  *          Execute as:  Me
@@ -76,7 +76,7 @@ function ping() {
     sheet: SHEET_NAME,
     rows: count,
     geminiKey: props.getProperty('GEMINI_API_KEY') ? 'set' : 'MISSING',
-    model: props.getProperty('GEMINI_MODEL') || 'gemini-2.5-flash',
+    model: props.getProperty('GEMINI_MODEL') || 'gemini-3.6-flash',
     driveArchive: props.getProperty('DRIVE_FOLDER_ID') ? 'on' : 'off',
     time: new Date().toISOString()
   };
@@ -86,7 +86,7 @@ function scanCard(body) {
   var props = PropertiesService.getScriptProperties();
   var key = props.getProperty('GEMINI_API_KEY');
   if (!key) return { ok: false, error: 'GEMINI_API_KEY is not set in Script Properties.' };
-  var model = props.getProperty('GEMINI_MODEL') || 'gemini-2.5-flash';
+  var model = props.getProperty('GEMINI_MODEL') || 'gemini-3.6-flash';
 
   var image = String(body.image || '');
   image = image.replace(/^data:image\/[a-z]+;base64,/i, '');

@@ -21,7 +21,7 @@ No server to run and no build step: `index.html` is a static page you host anywh
 3. Get a free **Gemini API key**: https://aistudio.google.com/apikey
 4. In Apps Script: **Project Settings (⚙) → Script Properties → Add script property**
    - `GEMINI_API_KEY` = your key  *(required)*
-   - `GEMINI_MODEL` = `gemini-2.5-flash`  *(optional; this is the default)*
+   - `GEMINI_MODEL` = `gemini-3.6-flash`  *(optional; this is the default)*
    - `DRIVE_FOLDER_ID` = a Drive folder id  *(optional; archives each card image and links it in the sheet)*
 5. **Deploy → New deployment → Web app**
    - Execute as: **Me**
