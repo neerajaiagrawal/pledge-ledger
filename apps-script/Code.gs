@@ -351,7 +351,14 @@ function archiveImage(dataUrl, mime, name) {
     var blob = Utilities.newBlob(bytes, mime || 'image/jpeg',
       'pledge_' + (name || 'card').replace(/[^\w]+/g, '_') + '_' + Date.now() + '.jpg');
     var file = DriveApp.getFolderById(folderId).createFile(blob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    // Private by default: the file is visible only to people who already have
+    // access to the folder (i.e. you / whoever the sheet+folder is shared with).
+    // Card images can contain donor PII and handwritten card details, so we do
+    // NOT make them "anyone with the link". Set ARCHIVE_PUBLIC=true only if you
+    // deliberately want open links.
+    if (String(PropertiesService.getScriptProperties().getProperty('ARCHIVE_PUBLIC')).toLowerCase() === 'true') {
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    }
     return file.getUrl();
   } catch (err) {
     return 'archive-error: ' + String(err);
